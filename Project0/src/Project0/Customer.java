@@ -19,6 +19,7 @@ public class Customer {
 	}
 	
 	public double withdraw(Account _a, double _amount) {
+		_amount = (double)Math.round(_amount * 100d) / 100d;
 		if (accounts.contains(_a) && _a.status == AccountStatus.Active && _amount > 0.0d && _a.balance > _amount) {
 			_a.balance -= _amount;
 			return _a.balance;
@@ -28,6 +29,7 @@ public class Customer {
 	}
 	
 	public double deposit(Account _a, double _amount) {
+		_amount = (double)Math.round(_amount * 100d) / 100d;
 		if (accounts.contains(_a) && _a.status == AccountStatus.Active && _amount > 0.0d) {
 			_a.balance += _amount;
 			return _a.balance;
@@ -37,6 +39,7 @@ public class Customer {
 	}
 	
 	public double[] transfer(Account _from, Account _to, double _amount) {
+		_amount = (double)Math.round(_amount * 100d) / 100d;
 		if (accounts.contains(_from) && _from != _to && _from.status == AccountStatus.Active && _to.status == AccountStatus.Active && _amount > 0.0d && _from.balance > _amount)
 		{
 			_from.balance -= _amount;
