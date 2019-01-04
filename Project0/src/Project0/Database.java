@@ -26,43 +26,42 @@ public class Database {
 			e.printStackTrace();
 		}
 	}
-	
-	public int insertAccount(Account _a) {
+
+	public void insertAccount(Account _a) {
 		try {
 			Statement s = connection.createStatement();
 			ResultSet count = s.executeQuery("SELECT COUNT(id)+1 AS count FROM accounts");
 			count.next();
-			int id = count.getInt("count");
-			
+			_a.id = count.getInt("count");
+
 			PreparedStatement statement = connection.prepareStatement("INSERT INTO accounts VALUES (?, ?, ?, ?)");
 			Array names = connection.createArrayOf("VARCHAR", _a.accountNames);
-			statement.setInt(1, id);
+			statement.setInt(1, _a.id);
 			statement.setArray(2, names);
 			statement.setString(3, _a.status.toString());
 			statement.setDouble(4, _a.balance);
 			statement.execute();
-			return id;
 		} catch (SQLException e) {
 			e.printStackTrace();
 		}
-		return -1;
 	}
-	
+
 	public void updateAccount(Account _a) {
 		try {
-			PreparedStatement statement = connection.prepareStatement("UPDATE accounts SET customers=?, status=?, balance=? where id=?");
+			PreparedStatement statement = connection
+					.prepareStatement("UPDATE accounts SET customers=?, status=?, balance=? where id=?");
 			Array names = connection.createArrayOf("VARCHAR", _a.accountNames);
 			statement.setArray(1, names);
 			statement.setString(2, _a.status.toString());
 			statement.setDouble(3, _a.balance);
 			statement.setInt(4, _a.id);
 			statement.execute();
-			
+
 		} catch (SQLException e) {
 			e.printStackTrace();
 		}
 	}
-	
+
 	public Account retrieveAccount(int _id) {
 		try {
 			Statement statement = connection.createStatement();
@@ -105,7 +104,7 @@ public class Database {
 		}
 		return null;
 	}
-	
+
 	public void insertCustomer(Customer _c) {
 		try {
 			PreparedStatement statement = connection.prepareStatement("INSERT INTO customers VALUES (?, ?, ?)");
@@ -114,7 +113,7 @@ public class Database {
 			statement.setString(2, _c.password);
 			statement.setArray(3, accounts);
 			statement.execute();
-			
+
 		} catch (SQLException e) {
 			e.printStackTrace();
 		}
@@ -123,36 +122,53 @@ public class Database {
 	public Customer retrieveCustomer(String _name) {
 		try {
 			Statement statement = connection.createStatement();
-			ResultSet customers = statement.executeQuery("SELECT * FROM customers WHERE username='" + _name + "'");
+			ResultSet customers = statement.executeQuery(
+					"SELECT * FROM customers LEFT JOIN accounts ON accounts.id = ANY (customers.accounts) WHERE username = '" + _name + "'");
 			if (!customers.isBeforeFirst()) {
 				return null;
 			}
-			Customer c = new Customer(customers.getString("username"), customers.getString("password"));
-			ResultSet accounts = statement
-					.executeQuery("select * from accounts where id in " + customers.getArray("accounts"));
-			while (accounts.next()) {
-				Account a = new Account((String[]) accounts.getArray("customers").getArray());
-				a.id = accounts.getInt("id");
-				a.status = AccountStatus.valueOf(accounts.getString("status"));
-				a.balance = accounts.getDouble("balance");
-				c.accounts.add(a);
+			List<Customer> result = new ArrayList<Customer>();
+			while (customers.next()) {
+				Customer c = new Customer(customers.getString("username"), customers.getString("password"));
+				Integer[] ids = (Integer[]) customers.getArray("accounts").getArray();
+				for (Integer id : ids) {
+					Account a = new Account((String[]) customers.getArray("customers").getArray());
+					a.id = id;
+					a.status = AccountStatus.valueOf(customers.getString("status"));
+					a.balance = customers.getDouble("balance");
+					c.accounts.add(a);
+				}
+				boolean isNotInList = true;
+				for (Customer inList : result) {
+					if (c.username.equals(inList.username)) {
+						isNotInList = false;
+					}
+				}
+				if (isNotInList) {
+					result.add(c);
+				}
 			}
-			return c;
+			return result.get(0);
 		} catch (SQLException e) {
 			e.printStackTrace();
 		}
 		return null;
 	}
-	
+
 	public void updateCustomer(Customer _c) {
 		try {
-			PreparedStatement statement = connection.prepareStatement("UPDATE customers SET accounts=?, password=? where username=?");
-			Array accounts = connection.createArrayOf("INTEGER", _c.accounts.toArray());
+			PreparedStatement statement = connection
+					.prepareStatement("UPDATE customers SET accounts=?, password=? where username=?");
+			Integer[] accountIds = new Integer[_c.accounts.size()];
+			for (int i = 0; i < accountIds.length; i++) {
+				accountIds[i] = _c.accounts.get(i).id;
+			}
+			Array accounts = connection.createArrayOf("INTEGER", accountIds);
 			statement.setArray(1, accounts);
 			statement.setString(2, _c.password);
 			statement.setString(3, _c.username);
 			statement.execute();
-			
+
 		} catch (SQLException e) {
 			e.printStackTrace();
 		}
@@ -161,21 +177,30 @@ public class Database {
 	public List<Customer> retrieveAllCustomers() {
 		try {
 			Statement statement = connection.createStatement();
-			ResultSet customers = statement.executeQuery("SELECT * FROM customers");
+			ResultSet customers = statement.executeQuery(
+					"SELECT * FROM customers LEFT JOIN accounts ON accounts.id = ANY (customers.accounts)");
 			if (!customers.isBeforeFirst()) {
 				return null;
 			}
 			List<Customer> result = new ArrayList<Customer>();
 			while (customers.next()) {
 				Customer c = new Customer(customers.getString("username"), customers.getString("password"));
-				ResultSet accounts = statement
-						.executeQuery("SELECT * FROM accounts WHERE id IN '" + customers.getArray("accounts") + "'");
-				while (accounts.next()) {
-					Account a = new Account((String[]) accounts.getArray("customers").getArray());
-					a.id = accounts.getInt("id");
-					a.status = AccountStatus.valueOf(accounts.getString("status"));
-					a.balance = accounts.getDouble("balance");
+				Integer[] ids = (Integer[]) customers.getArray("accounts").getArray();
+				for (Integer id : ids) {
+					Account a = new Account((String[]) customers.getArray("customers").getArray());
+					a.id = id;
+					a.status = AccountStatus.valueOf(customers.getString("status"));
+					a.balance = customers.getDouble("balance");
 					c.accounts.add(a);
+				}
+				boolean isNotInList = true;
+				for (Customer inList : result) {
+					if (c.username.equals(inList.username)) {
+						isNotInList = false;
+					}
+				}
+				if (isNotInList) {
+					result.add(c);
 				}
 			}
 			return result;
